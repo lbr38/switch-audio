@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+
+# Switch audio output and input for PulseAudio
+# Runs well on Ubuntu 22.04 / Linux Mint 21
+
+# Colors
+GREEN=$(tput setaf 2)
+YELLOW=$(tput setaf 3)
+RESET=$(tput sgr0)
+# Separator
+SEP=$(printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' '-')
+
+#
+# Audio outputs (speakers/headphones)
+#
+
+# List all audio outputs (index and name)
+function list_sinks()
+{
+    echo -e "\n${YELLOW}Outputs :${RESET}\n"
+
+    pacmd list-sinks | egrep 'index:|name:'
+
+    echo -e "\nApply output with: --output <index>\n"
+}
+
+# Switch default audio output
+function switch_sink_default()
+{
+    echo -n "Switching default sink (output) to $1: "
+
+    pactl set-default-sink $1
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}OK${RESET}"
+    fi
+}
+
+# Switch audio output for all applications
+function switch_sink_applications()
+{
+    echo -n "Switching applications : "
+
+    pacmd list-sink-inputs | awk '/index:/{print $2}' | xargs -r -I{} pacmd move-sink-input {} $1
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}OK${RESET}"
+    fi
+}
+
+#
+# Audio inputs (microphones)
+#
+
+# List all audio inputs (index and name)
+function list_sources()
+{
+    echo -e "\n${YELLOW}Input sources :${RESET}\n"
+
+    pacmd list-sources | egrep 'index:|name:'
+
+    echo -e "\nApply input with: --input <index>\n"
+}
+
+# Switch default audio input
+function switch_source_default()
+{
+    echo -n "Switching default source (input) to $1: "
+    
+    pactl set-default-source $1
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}OK${RESET}"
+    fi
+}
+
+# Switch audio input for all applications
+function switch_source_applications()
+{
+    echo -n "Switching applications : "
+
+    pacmd list-source-outputs | awk '/index:/{print $2}' | xargs -r -I{} pacmd move-source-output {} $1
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}OK${RESET}"
+    fi
+}
+
+# If no argument is given, list all audio outputs and inputs
+if [ $# -eq 0 ]; then
+    list_sinks
+    list_sources
+fi
+
+while [ $# -ge 1 ];do
+    case "$1" in
+        --help)
+            help
+        ;;
+        --output|out)
+            if [ ! -z "$2" ]; then
+                echo -e "\nApplying output:"
+                switch_sink_default "$2"
+                switch_sink_applications "$2"
+                shift
+            fi
+        ;;
+        --input|in)
+            if [ ! -z "$2" ]; then
+                echo -e "\nApplying input:"
+                switch_source_default "$2"
+                switch_source_applications "$2"
+                shift
+            fi
+        ;;
+        esac
+    shift
+done
